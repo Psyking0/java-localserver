@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WebServ — Admin Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; padding: 2rem 1rem; }
+    header { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; }
+    header h1 { font-size: 1.6rem; }
+    header h1 span { color: #58a6ff; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #3fb950; display: inline-block; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .stat { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 1.2rem; text-align: center; }
+    .stat .val { font-size: 2rem; font-weight: 700; color: #58a6ff; }
+    .stat .lbl { font-size: 0.78rem; color: #8b949e; margin-top: 0.2rem; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 1.2rem 1.5rem; margin-bottom: 1rem; }
+    .card h3 { margin-bottom: 0.8rem; font-size: 1rem; border-bottom: 1px solid #21262d; padding-bottom: 0.5rem; }
+    pre { font-size: 0.78rem; color: #8b949e; white-space: pre-wrap; word-break: break-all; }
+    .badge-ok  { background: #238636; color: #fff; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; }
+    .badge-err { background: #da3633; color: #fff; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; }
+    a.back { color: #58a6ff; text-decoration: none; font-size: 0.9rem; }
+    a.back:hover { text-decoration: underline; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    td, th { border: 1px solid #21262d; padding: 6px 12px; text-align: left; }
+    th { background: #0d1117; color: #8b949e; }
+    tr:hover td { background: #1c2128; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="dot"></span>
+    <h1>Web<span>Serv</span> Admin Dashboard</h1>
+    <a class="back" href="/">← Home</a>
+  </header>
+
+  <div class="grid">
+    <div class="stat"><div class="val" id="s-uptime">—</div><div class="lbl">Uptime</div></div>
+    <div class="stat"><div class="val" id="s-reqs">—</div><div class="lbl">Total Requests</div></div>
+    <div class="stat"><div class="val" id="s-conns">—</div><div class="lbl">Live Connections</div></div>
+    <div class="stat"><div class="val" id="s-in">—</div><div class="lbl">Bytes In</div></div>
+    <div class="stat"><div class="val" id="s-out">—</div><div class="lbl">Bytes Out</div></div>
+    <div class="stat"><div class="val" id="s-404" style="color:#f78166">—</div><div class="lbl">404 Errors</div></div>
+    <div class="stat"><div class="val" id="s-500" style="color:#f78166">—</div><div class="lbl">500 Errors</div></div>
+    <div class="stat"><div class="val" id="s-mem">—</div><div class="lbl">JVM Heap MB</div></div>
+  </div>
+
+  <div class="card">
+    <h3>&#128202; Endpoint Tests</h3>
+    <table id="endpointTable">
+      <thead><tr><th>Endpoint</th><th>Method</th><th>Status</th><th>Response Time</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>&#128196; Raw Metrics JSON</h3>
+    <pre id="rawJson">Loading…</pre>
+  </div>
+
+  <script>
+    function fmtBytes(n) {
+      if (n < 1024) return n + ' B';
+      if (n < 1048576) return (n/1024).toFixed(1) + ' KB';
+      return (n/1048576).toFixed(2) + ' MB';
+    }
+
+    async function refresh() {
+      try {
+        const r = await fetch('/api/metrics');
+        const d = await r.json();
+        document.getElementById('s-uptime').textContent = d.uptime;
+        document.getElementById('s-reqs').textContent   = d.requests;
+        document.getElementById('s-conns').textContent  = d.live_connections;
+        document.getElementById('s-in').textContent     = fmtBytes(d.bytes_in);
+        document.getElementById('s-out').textContent    = fmtBytes(d.bytes_out);
+        document.getElementById('s-404').textContent    = d.errors_404;
+        document.getElementById('s-500').textContent    = d.errors_500;
+        document.getElementById('s-mem').textContent    = d.jvm_heap_mb + ' MB';
+        document.getElementById('rawJson').textContent  = JSON.stringify(d, null, 2);
+      } catch(e) {
+        document.getElementById('rawJson').textContent = 'Error: ' + e;
+      }
+    }
+
+    async function testEndpoints() {
+      const tests = [
+        { url: '/',            method: 'GET'    },
+        { url: '/api/metrics', method: 'GET'    },
+        { url: '/session',     method: 'GET'    },
+        { url: '/uploads/',    method: 'GET'    },
+        { url: '/old',         method: 'GET'    },
+        { url: '/notfound',    method: 'GET'    },
+        { url: '/cgi-bin/hello.py', method: 'GET' },
+        { url: '/cgi-sh/hello.sh',  method: 'GET' },
+      ];
+      const tbody = document.querySelector('#endpointTable tbody');
+      tbody.innerHTML = '';
+      for (const t of tests) {
+        const start = performance.now();
+        let status = '—', badge = '';
+        try {
+          const res = await fetch(t.url, { method: t.method, redirect: 'manual' });
+          status = res.status;
+          const ms = (performance.now() - start).toFixed(0);
+          const ok = status < 500;
+          badge = ok
+            ? `<span class="badge-ok">${status}</span>`
+            : `<span class="badge-err">${status}</span>`;
+          tbody.innerHTML += `<tr><td><a href="${t.url}" style="color:#58a6ff">${t.url}</a></td><td>${t.method}</td><td>${badge}</td><td>${ms} ms</td></tr>`;
+        } catch(e) {
+          tbody.innerHTML += `<tr><td>${t.url}</td><td>${t.method}</td><td><span class="badge-err">ERR</span></td><td>—</td></tr>`;
+        }
+      }
+    }
+
+    refresh();
+    testEndpoints();
+    setInterval(refresh, 3000);
+  </script>
+</body>
+</html>

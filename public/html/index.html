@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WebServ — Home</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 3rem 1rem; }
+    h1  { font-size: 2.5rem; margin-bottom: 0.4rem; }
+    h1 span { color: #58a6ff; }
+    p.sub { color: #8b949e; margin-bottom: 2.5rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; width: 100%; max-width: 960px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 1.2rem 1.5rem; }
+    .card h3 { margin-bottom: 0.4rem; font-size: 1rem; }
+    .card a  { color: #58a6ff; text-decoration: none; font-size: 0.9rem; }
+    .card a:hover { text-decoration: underline; }
+    .badge { display:inline-block; background:#238636; color:#fff; font-size:0.72rem; padding:2px 8px; border-radius:12px; margin-left:6px; vertical-align:middle; }
+    footer { margin-top: 3rem; color: #484f58; font-size: 0.8rem; }
+    form { margin-top: 0.5rem; }
+    input[type=file] { font-size: 0.82rem; color: #8b949e; }
+    button { margin-top: 0.4rem; background: #238636; color: #fff; border: none; padding: 5px 14px; border-radius: 5px; cursor: pointer; font-size: 0.82rem; }
+    button:hover { background: #2ea043; }
+    pre { font-size: 0.75rem; color: #8b949e; background: #0d1117; border: 1px solid #21262d; padding: 0.6rem; border-radius: 6px; overflow: auto; max-height: 100px; margin-top: 0.4rem; }
+    p.hint { font-size: 0.82rem; color: #8b949e; margin: 0.25rem 0; }
+    #uploadStatus { font-size: 0.8rem; margin-top: 0.3rem; color: #3fb950; }
+  </style>
+</head>
+<body>
+  <h1>Web<span>Serv</span> <span class="badge">HTTP/1.1</span></h1>
+  <p class="sub">Custom Java NIO server · non-blocking · single-threaded · event-driven</p>
+
+  <div class="grid">
+    <div class="card">
+      <h3>&#128202; Live Metrics</h3>
+      <p class="hint">JSON stats endpoint</p>
+      <a href="/api/metrics" target="_blank">/api/metrics</a>
+      <pre id="metrics">Loading…</pre>
+    </div>
+
+    <div class="card">
+      <h3>&#9881;&#65039; Admin Dashboard</h3>
+      <p class="hint">Endpoint tests & server stats</p>
+      <a href="/admin.html">/admin.html</a>
+    </div>
+
+    <div class="card">
+      <h3>&#127381; Session / Cookies</h3>
+      <p class="hint">Cookie-backed visit counter</p>
+      <a href="/session">/session</a>
+    </div>
+
+    <div class="card">
+      <h3>&#128013; Python CGI</h3>
+      <p class="hint">CGI via python3</p>
+      <a href="/cgi-bin/hello.py">/cgi-bin/hello.py</a>
+    </div>
+
+    <div class="card">
+      <h3>&#128032; Shell CGI</h3>
+      <p class="hint">CGI via /bin/bash</p>
+      <a href="/cgi-sh/hello.sh">/cgi-sh/hello.sh</a>
+    </div>
+
+    <div class="card">
+      <h3>&#128448; File Upload (POST)</h3>
+      <p class="hint">Saves to <code>/uploads/</code></p>
+      <form id="uploadForm">
+        <input type="file" id="fileInput">
+        <br>
+        <button type="submit">Upload</button>
+      </form>
+      <p id="uploadStatus"></p>
+    </div>
+
+    <div class="card">
+      <h3>&#128193; Upload Browser (GET)</h3>
+      <p class="hint">Auto-index of uploaded files</p>
+      <a href="/uploads/">/uploads/</a>
+    </div>
+
+    <div class="card">
+      <h3>&#10060; Delete Uploaded File</h3>
+      <p class="hint">Filename to delete from /uploads/</p>
+      <input id="delName" style="font-size:0.82rem;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:4px 8px;width:100%" placeholder="filename.ext">
+      <button id="delBtn" style="margin-top:0.4rem">DELETE</button>
+      <p id="delStatus" style="font-size:0.8rem;margin-top:0.3rem"></p>
+    </div>
+
+    <div class="card">
+      <h3>&#128259; Redirect Test</h3>
+      <p class="hint">302 → / (for audit)</p>
+      <a href="/old">/old → /</a>
+    </div>
+
+    <div class="card">
+      <h3>&#128683; 404 Test</h3>
+      <p class="hint">Custom error page</p>
+      <a href="/does-not-exist">/does-not-exist</a>
+    </div>
+  </div>
+
+  <footer>WebServ &mdash; Java NIO &mdash; no frameworks &mdash; single thread</footer>
+
+  <script>
+    async function loadMetrics() {
+      try {
+        const r = await fetch('/api/metrics');
+        const d = await r.json();
+        document.getElementById('metrics').textContent = JSON.stringify(d, null, 2);
+      } catch (e) {
+        document.getElementById('metrics').textContent = 'unavailable';
+      }
+    }
+    loadMetrics();
+    setInterval(loadMetrics, 5000);
+
+    // File upload
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const file = document.getElementById('fileInput').files[0];
+      const status = document.getElementById('uploadStatus');
+      if (!file) { status.textContent = 'No file selected.'; return; }
+      try {
+        const res = await fetch('/uploads/' + encodeURIComponent(file.name), {
+          method: 'POST',
+          body: await file.arrayBuffer(),
+          headers: { 'Content-Type': file.type || 'application/octet-stream' }
+        });
+        status.style.color = res.ok ? '#3fb950' : '#f78166';
+        status.textContent = res.ok ? '✓ Uploaded: ' + file.name : '✗ Failed (' + res.status + ')';
+      } catch (err) {
+        status.style.color = '#f78166';
+        status.textContent = '✗ Error: ' + err.message;
+      }
+    });
+
+    // File delete
+    document.getElementById('delBtn').addEventListener('click', async () => {
+      const name   = document.getElementById('delName').value.trim();
+      const status = document.getElementById('delStatus');
+      if (!name) { status.textContent = 'Enter a filename.'; return; }
+      try {
+        const res = await fetch('/uploads/' + encodeURIComponent(name), { method: 'DELETE' });
+        status.style.color = res.ok ? '#3fb950' : '#f78166';
+        status.textContent = res.ok ? '✓ Deleted: ' + name : '✗ Failed (' + res.status + ')';
+      } catch (err) {
+        status.style.color = '#f78166';
+        status.textContent = '✗ Error: ' + err.message;
+      }
+    });
+  </script>
+</body>
+</html>

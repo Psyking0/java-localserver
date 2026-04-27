@@ -1,0 +1,69 @@
+[
+  {
+    "bind":           "127.0.0.1",
+    "ports":          [8080, 8081],
+    "hostname":       "primary",
+    "max_body_bytes": 1048576,
+    "error_pages": {
+      "400": "error_pages/400.html",
+      "403": "error_pages/403.html",
+      "404": "error_pages/404.html",
+      "405": "error_pages/405.html",
+      "413": "error_pages/413.html",
+      "500": "error_pages/500.html"
+    },
+    "locations": [
+      {
+        "prefix":         "/",
+        "methods":        ["GET", "POST", "DELETE"],
+        "root_dir":       "public/html",
+        "index_file":     "index.html",
+        "enable_listing": false
+      },
+      {
+        "prefix":         "/uploads",
+        "methods":        ["GET", "POST", "DELETE"],
+        "root_dir":       "public/uploads",
+        "enable_listing": true
+      },
+      {
+        "prefix":     "/cgi-bin",
+        "methods":    ["GET", "POST"],
+        "root_dir":   "public/cgi-bin",
+        "cgi_suffix": ".py"
+      },
+      {
+        "prefix":     "/cgi-sh",
+        "methods":    ["GET", "POST"],
+        "root_dir":   "public/cgi-bin",
+        "cgi_suffix": ".sh"
+      },
+      {
+        "prefix":      "/old",
+        "redirect_to": "/"
+      }
+    ]
+  },
+  {
+    "bind":           "127.0.0.1",
+    "ports":          [8082],
+    "hostname":       "restricted",
+    "max_body_bytes": 512,
+    "error_pages": {
+      "400": "error_pages/400.html",
+      "403": "error_pages/403.html",
+      "404": "error_pages/404.html",
+      "405": "error_pages/405.html",
+      "413": "error_pages/413.html",
+      "500": "error_pages/500.html"
+    },
+    "locations": [
+      {
+        "prefix":     "/",
+        "methods":    ["GET"],
+        "root_dir":   "public/html",
+        "index_file": "index.html"
+      }
+    ]
+  }
+]
