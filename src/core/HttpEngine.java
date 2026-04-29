@@ -111,6 +111,8 @@ public class HttpEngine {
                         else if (key.isReadable())  onRead(key, readBuf);
                         else if (key.isWritable()) onWrite(key);
                     } catch (Exception ex) {
+                        System.err.println(ex.getClass().getName());
+                        System.err.println(ex.getMessage());
                         System.err.println("[ERROR] Key handler: " + ex.getMessage());
                         dropKey(key);
                     }
@@ -142,7 +144,15 @@ public class HttpEngine {
         peer.touch();
         readBuf.clear();
 
-        int n = peer.channel.read(readBuf);
+        int n;
+        try {
+            n = peer.channel.read(readBuf);
+        } catch (java.net.SocketException e) {
+            dropKey(key);
+            return;
+        }   
+
+        n = peer.channel.read(readBuf);
         if (n == -1) { dropKey(key); return; }
         if (n > 0) bytesIn.addAndGet(n);
 
