@@ -37,9 +37,16 @@ public class ScriptRunner {
             ProcessBuilder pb = buildProcess(scriptFile, req);
             Process proc = pb.start();
 
+            boolean finished = proc.waitFor(CGI_TIMEOUT_SEC, TimeUnit.SECONDS);
+
             // Feed request body to CGI stdin
             byte[] body = req.bodyBytes();
             try (OutputStream stdin = proc.getOutputStream()) {
+                if (!finished){
+                    proc.destroyForcibly();
+                    System.err.println("[WARN] CGI script timed out: " + scriptFile.getName());
+                    return errorResponse(StatusCode.INTERNAL_SERVER_ERROR);
+                } 
                 if (body != null && body.length > 0) {
                     stdin.write(body);
                 }
@@ -51,7 +58,7 @@ public class ScriptRunner {
                 rawOutput = stdout.readAllBytes();
             }
 
-            boolean finished = proc.waitFor(CGI_TIMEOUT_SEC, TimeUnit.SECONDS);
+            finished = proc.waitFor(CGI_TIMEOUT_SEC, TimeUnit.SECONDS);
             if (!finished) {
                 proc.destroyForcibly();
                 System.err.println("[WARN] CGI script timed out: " + scriptFile.getName());
